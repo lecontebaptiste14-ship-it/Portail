@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e12">
+<title>Alerte Portail</title>
+<style>
+/* Écran pensé pour la nuit : fond sombre, un seul accent ambre, rouge réservé à l'alerte */
+:root{
+  --bg:#0b0e12; --panel:#141922; --line:#232b38; --fg:#e8edf3; --mut:#8a97a8;
+  --ok:#3ddc97; --alert:#ff4d4d; --acc:#ffb020; --acc-fg:#1a1200;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+body{padding:max(12px,env(safe-area-inset-top)) 16px max(20px,env(safe-area-inset-bottom))}
+main{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+h1{margin:0;font-size:20px;letter-spacing:.01em}
+.pill{padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--mut);font-size:13px;white-space:nowrap}
+.pill.on{color:var(--ok);border-color:#1f5a43}
+.pill.warm{color:var(--acc);border-color:#5a4210}
+.pill.alert{color:#fff;background:var(--alert);border-color:var(--alert)}
+.stage{position:relative;aspect-ratio:4/3;width:100%;background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.stage canvas{touch-action:none;cursor:crosshair}
+.ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--mut)}
+.hint{margin:0;color:var(--mut);font-size:13px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.hint span{min-width:0}
+button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:11px 14px;min-height:44px;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button.primary{background:var(--acc);border-color:var(--acc);color:var(--acc-fg);font-weight:600}
+button.primary.stop{background:var(--panel);border-color:var(--alert);color:var(--alert)}
+button.small{min-height:36px;padding:6px 10px;font-size:13px;flex:none}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>button{flex:1 1 140px}
+.row>button.primary{flex:2 1 220px}
+.ctl{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:14px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field label,.field .lab{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--mut)}
+.field output{color:var(--fg);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--acc);height:28px;margin:0}
+select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:40px}
+.meter{position:relative;height:10px;border-radius:5px;background:var(--bg);border:1px solid var(--line);overflow:hidden}
+.meter i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--ok);transition:width .1s}
+.meter i.over{background:var(--alert)}
+.meter b{position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--acc)}
+.err{margin:0;padding:12px 14px;border:1px solid var(--alert);border-radius:10px;color:#ffb4b4;background:#2a1315}
+h2{margin:6px 0 0;font-size:14px;color:var(--mut);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.log li{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+.log img{width:80px;height:60px;object-fit:cover;border-radius:6px;background:#000;flex:none}
+.log .t{font-variant-numeric:tabular-nums;font-weight:600}
+.log .m{color:var(--mut);font-size:13px}
+.empty{color:var(--mut);font-size:14px;margin:0}
+.tip{color:var(--mut);font-size:13px;margin:0}
+#black{position:fixed;inset:0;background:#000;z-index:50;display:flex;align-items:flex-end;justify-content:center;padding:24px;color:#2c3340;font-size:13px;text-align:center;cursor:pointer}
+#alarm{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center;background:var(--alert);color:#fff;animation:flash .6s steps(1) infinite}
+#alarm h2{margin:0;color:#fff;font-size:30px;letter-spacing:.02em;text-transform:none}
+#alarm p{margin:0;font-size:18px;font-variant-numeric:tabular-nums}
+#alarm button{background:#fff;color:#7a0000;border:0;font-weight:700;font-size:20px;padding:18px 36px;min-height:60px}
+@keyframes flash{0%{background:var(--alert)}50%{background:#5a0a0a}}
+@media (prefers-reduced-motion:reduce){#alarm{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Alerte Portail</h1>
+    <span id="st" class="pill">Arrêté</span>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Image de la caméra">
+    <video id="v" playsinline muted autoplay></video>
+    <canvas id="ov"></canvas>
+    <div id="ph" class="ph">Appuie sur « Démarrer » pour activer la caméra</div>
+  </section>
+
+  <p class="hint">
+    <span>Glisse un doigt sur l'image pour ne surveiller que la zone de la grille.</span>
+    <button id="zreset" class="small" hidden>Image entière</button>
+  </p>
+
+  <p id="err" class="err" role="alert" hidden></p>
+
+  <div class="row">
+    <button id="go" class="primary">Démarrer la surveillance</button>
+    <button id="dark" disabled>Écran noir</button>
+  </div>
+
+  <section class="ctl" aria-label="Réglages">
+    <div class="field">
+      <div class="lab"><span>Mouvement détecté en ce moment</span></div>
+      <div class="meter" aria-hidden="true"><i id="mf"></i><b></b></div>
+    </div>
+    <div class="field">
+      <label for="sens"><span>Sensibilité</span><output id="sensO"></output></label>
+      <input id="sens" type="range" min="1" max="10" step="1">
+    </div>
+    <div class="field">
+      <label for="size"><span>Taille minimale du mouvement</span><output id="sizeO"></output></label>
+      <input id="size" type="range" min="1" max="20" step="1">
+    </div>
+    <div class="field">
+      <label for="vol"><span>Volume de l'alarme</span><output id="volO"></output></label>
+      <input id="vol" type="range" min="10" max="100" step="5">
+    </div>
+    <div class="field">
+      <label for="cool"><span>Pause après une alerte</span></label>
+      <select id="cool">
+        <option value="5">5 secondes</option>
+        <option value="15">15 secondes</option>
+        <option value="30">30 secondes</option>
+        <option value="60">1 minute</option>
+      </select>
+    </div>
+    <div class="row">
+      <button id="cam">Caméra : arrière</button>
+      <button id="test">Tester le son</button>
+    </div>
+  </section>
+
+  <h2>Dernières alertes</h2>
+  <ul id="log" class="log"></ul>
+  <p id="empty" class="empty">Aucune alerte pour l'instant.</p>
+
+  <p class="tip">Garde cette page ouverte et l'écran allumé : le téléphone arrête la caméra s'il se verrouille. Branche-le sur secteur pour la nuit.</p>
+</main>
+
+<div id="black" hidden>Surveillance active. Touche l'écran pour revenir.</div>
+<div id="alarm" hidden role="alertdialog" aria-live="assertive">
+  <h2>Mouvement devant la grille</h2>
+  <p id="alarmT"></p>
+  <button id="ack">Acquitter</button>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var W = 80, H = 60;
+  var video = $("v"), ov = $("ov"), octx = ov.getContext("2d");
+  var work = document.createElement("canvas"); work.width = W; work.height = H;
+  var wctx = work.getContext("2d", { willReadFrequently: true });
+  var snap = document.createElement("canvas"); snap.width = 160; snap.height = 120;
+  var sctx = snap.getContext("2d");
+
+  var FULL = { x0: 0, y0: 0, x1: 1, y1: 1 };
+  var S = { sens: 6, size: 3, vol: 80, cool: 15, facing: "environment", zone: FULL };
+  try { Object.assign(S, JSON.parse(localStorage.getItem("alerte-portail") || "{}")); } catch (e) {}
+  function validZone(z){
+    return z && [z.x0, z.y0, z.x1, z.y1].every(function(n){ return typeof n === "number" && n >= 0 && n <= 1; })
+      && z.x1 - z.x0 > 0.04 && z.y1 - z.y0 > 0.04;
+  }
+  if (!validZone(S.zone)) S.zone = FULL;
+  function save(){ try { localStorage.setItem("alerte-portail", JSON.stringify(S)); } catch (e) {} }
+
+  var stream = null, running = false, bg = null, raf = 0, lastTick = 0;
+  var hits = 0, warmUntil = 0, lastMask = null, dragZone = null;
+  var actx = null, alarmTimer = null, alarmEnd = 0, lastEnd = 0, alarmOn = false, wake = null;
+  var alertCount = 0;
+
+  /* ---------- Interface ---------- */
+  function setStatus(text, cls){
+    var el = $("st"); el.textContent = text; el.className = "pill" + (cls ? " " + cls : "");
+  }
+  function showErr(msg){ var e = $("err"); e.textContent = msg; e.hidden = !msg; }
+  function syncLabels(){
+    $("sensO").textContent = S.sens + " / 10";
+    $("sizeO").textContent = S.size + " %";
+    $("volO").textContent = S.vol + " %";
+    $("sens").value = S.sens; $("size").value = S.size; $("vol").value = S.vol; $("cool").value = String(S.cool);
+    $("cam").textContent = "Caméra : " + (S.facing === "environment" ? "arrière" : "avant");
+    $("zreset").hidden = !(S.zone.x0 > 0 || S.zone.y0 > 0 || S.zone.x1 < 1 || S.zone.y1 < 1);
+  }
+  [["sens", "sens"], ["size", "size"], ["vol", "vol"]].forEach(function(p){
+    $(p[0]).addEventListener("input", function(){ S[p[1]] = parseInt(this.value, 10); syncLabels(); save(); });
+  });
+  $("cool").addEventListener("change", function(){ S.cool = parseInt(this.value, 10); save(); });
+  $("zreset").addEventListener("click", function(){ S.zone = FULL; bg = null; syncLabels(); save(); draw(); });
+  $("cam").addEventListener("click", function(){
+    S.facing = S.facing === "environment" ? "user" : "environment"; syncLabels(); save();
+    if (running) { stop(); start(); }
+  });
+  $("test").addEventListener("click", function(){
+    initAudio();
+    [880, 660, 880, 660].forEach(function(f, i){ setTimeout(function(){ beep(f, 0.2); }, i * 260); });
+  });
+  $("go").addEventListener("click", function(){ running ? stop() : start(); });
+  $("dark").addEventListener("click", function(){ $("black").hidden = false; });
+  $("black").addEventListener("click", function(){ $("black").hidden = true; });
+  $("ack").addEventListener("click", function(){ stopAlarm(); });
+
+  /* ---------- Zone de surveillance ---------- */
+  function norm(ev){
+    var r = ov.getBoundingClientRect();
+    return { x: Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height)) };
+  }
+  var dragStart = null;
+  ov.addEventListener("pointerdown", function(ev){
+    dragStart = norm(ev); dragZone = null;
+    try { ov.setPointerCapture(ev.pointerId); } catch (e) {}
+  });
+  ov.addEventListener("pointermove", function(ev){
+    if (!dragStart) return;
+    var p = norm(ev);
+    dragZone = { x0: Math.min(dragStart.x, p.x), y0: Math.min(dragStart.y, p.y), x1: Math.max(dragStart.x, p.x), y1: Math.max(dragStart.y, p.y) };
+    draw();
+  });
+  function endDrag(){
+    if (dragStart && validZone(dragZone)) { S.zone = dragZone; bg = null; hits = 0; save(); syncLabels(); }
+    dragStart = null; dragZone = null; draw();
+  }
+  ov.addEventListener("pointerup", endDrag);
+  ov.addEventListener("pointercancel", endDrag);
+
+  function draw(){
+    var w = ov.clientWidth, h = ov.clientHeight, dpr = window.devicePixelRatio || 1;
+    if (!w || !h) return;
+    if (ov.width !== Math.round(w * dpr) || ov.height !== Math.round(h * dpr)) {
+      ov.width = Math.round(w * dpr); ov.height = Math.round(h * dpr);
+    }
+    octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    octx.clearRect(0, 0, w, h);
+    var z = dragZone || S.zone;
+    var zx = z.x0 * w, zy = z.y0 * h, zw = (z.x1 - z.x0) * w, zh = (z.y1 - z.y0) * h;
+    var isFull = z.x0 <= 0 && z.y0 <= 0 && z.x1 >= 1 && z.y1 >= 1;
+    if (!isFull) {
+      octx.fillStyle = "rgba(0,0,0,.5)";
+      octx.fillRect(0, 0, w, zy);
+      octx.fillRect(0, zy + zh, w, h - zy - zh);
+      octx.fillRect(0, zy, zx, zh);
+      octx.fillRect(zx + zw, zy, w - zx - zw, zh);
+    }
+    if (lastMask && running) {
+      octx.fillStyle = "rgba(255,77,77,.55)";
+      var cw = w / W, ch = h / H;
+      for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
+        if (lastMask[y * W + x]) octx.fillRect(x * cw, y * ch, cw + 0.5, ch + 0.5);
+      }
+    }
+    if (!isFull) {
+      octx.strokeStyle = "#ffb020"; octx.lineWidth = 2; octx.setLineDash([6, 4]);
+      octx.strokeRect(zx + 1, zy + 1, zw - 2, zh - 2); octx.setLineDash([]);
+    }
+  }
+  window.addEventListener("resize", draw);
+
+  /* ---------- Son ---------- */
+  function initAudio(){
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === "suspended") actx.resume();
+    } catch (e) {}
+  }
+  function beep(freq, dur){
+    if (!actx) return;
+    try {
+      var o = actx.createOscillator(), g = actx.createGain();
+      o.type = "square"; o.frequency.value = freq;
+      g.gain.value = (S.vol / 100) * 0.6;
+      o.connect(g); g.connect(actx.destination);
+      o.start(); o.stop(actx.currentTime + dur);
+    } catch (e) {}
+  }
+
+  /* ---------- Alarme ---------- */
+  function addLog(pct){
+    alertCount++;
+    sctx.drawImage(video, 0, 0, snap.width, snap.height);
+    var li = document.createElement("li");
+    var img = document.createElement("img");
+    img.alt = "Image au moment de l'alerte";
+    try { img.src = snap.toDataURL("image/jpeg", 0.6); } catch (e) {}
+    var box = document.createElement("div");
+    var t = document.createElement("div"); t.className = "t"; t.textContent = new Date().toLocaleTimeString("fr-FR");
+    var m = document.createElement("div"); m.className = "m"; m.textContent = "Zone touchée : " + pct.toFixed(1).replace(".", ",") + " %";
+    box.appendChild(t); box.appendChild(m); li.appendChild(img); li.appendChild(box);
+    var log = $("log"); log.insertBefore(li, log.firstChild);
+    while (log.children.length > 20) log.removeChild(log.lastChild);
+    $("empty").hidden = true;
+    return t.textContent;
+  }
+  function startAlarm(pct){
+    initAudio();
+    alarmOn = true; alarmEnd = performance.now() + 20000;
+    var time = addLog(pct);
+    $("alarmT").textContent = time;
+    $("alarm").hidden = false;
+    setStatus("ALERTE", "alert");
+    var k = 0;
+    clearInterval(alarmTimer);
+    alarmTimer = setInterval(function(){
+      beep(k % 2 ? 660 : 990, 0.22); k++;
+      if (navigator.vibrate) { try { navigator.vibrate(200); } catch (e) {} }
+      if (performance.now() > alarmEnd) stopAlarm();
+    }, 300);
+  }
+  function stopAlarm(){
+    clearInterval(alarmTimer); alarmTimer = null;
+    if (!alarmOn) return;
+    alarmOn = false; lastEnd = performance.now(); hits = 0; bg = null;
+    $("alarm").hidden = true;
+    if (running) setStatus("Surveillance active", "on");
+  }
+
+  /* ---------- Détection ---------- */
+  function tick(now){
+    if (!running) return;
+    raf = requestAnimationFrame(tick);
+    if (now - lastTick < 120) return;
+    lastTick = now;
+    if (video.readyState < 2) return;
+
+    wctx.drawImage(video, 0, 0, W, H);
+    var d = wctx.getImageData(0, 0, W, H).data;
+    var cur = new Float32Array(W * H);
+    for (var i = 0, j = 0; i < cur.length; i++, j += 4) cur[i] = 0.299 * d[j] + 0.587 * d[j + 1] + 0.114 * d[j + 2];
+    if (!bg) { bg = Float32Array.from(cur); return; }
+
+    var z = S.zone;
+    var x0 = Math.floor(z.x0 * W), x1 = Math.ceil(z.x1 * W), y0 = Math.floor(z.y0 * H), y1 = Math.ceil(z.y1 * H);
+    var x, y, idx, cnt = 0, ms = 0;
+    for (y = y0; y < y1; y++) for (x = x0; x < x1; x++) { idx = y * W + x; ms += cur[idx] - bg[idx]; cnt++; }
+    if (!cnt) return;
+    ms = Math.max(-20, Math.min(20, ms / cnt)); /* compense les variations globales de luminosité */
+
+    var thr = Math.max(8, 42 - S.sens * 3.5);
+    var mask = new Uint8Array(W * H), changed = 0;
+    for (y = y0; y < y1; y++) for (x = x0; x < x1; x++) {
+      idx = y * W + x;
+      if (Math.abs(cur[idx] - bg[idx] - ms) > thr) { mask[idx] = 1; changed++; }
+    }
+    var pct = changed / cnt * 100;
+    lastMask = mask;
+
+    for (var k = 0; k < bg.length; k++) bg[k] += (cur[k] - bg[k]) * 0.08;
+
+    var mf = $("mf");
+    mf.style.width = Math.min(100, pct / S.size * 50) + "%";
+    mf.className = pct >= S.size ? "over" : "";
+
+    if (now < warmUntil) { setStatus("Calibrage…", "warm"); draw(); return; }
+    if (!alarmOn) setStatus("Surveillance active", "on");
+
+    if (pct >= S.size) hits++; else hits = 0;
+    if (hits >= 2 && !alarmOn && now - lastEnd > S.cool * 1000) startAlarm(pct);
+    draw();
+  }
+
+  /* ---------- Caméra ---------- */
+  async function requestWake(){
+    try { if (navigator.wakeLock && !wake) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", function(){ wake = null; }); } } catch (e) { wake = null; }
+  }
+  document.addEventListener("visibilitychange", function(){
+    if (document.visibilityState === "visible" && running) { requestWake(); if (actx && actx.state === "suspended") actx.resume(); }
+  });
+
+  async function start(){
+    showErr("");
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showErr("La caméra ne fonctionne que sur une page en https://. Ouvre ce fichier depuis un hébergement HTTPS (voir les consignes).");
+      return;
+    }
+    initAudio();
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: S.facing }, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false
+      });
+    } catch (e) {
+      var n = e && e.name;
+      showErr(n === "NotAllowedError" ? "Accès à la caméra refusé. Autorise la caméra pour ce site dans les réglages du navigateur."
+        : n === "NotFoundError" ? "Aucune caméra trouvée sur cet appareil."
+        : n === "NotReadableError" ? "La caméra est déjà utilisée par une autre application."
+        : "Impossible d'ouvrir la caméra (" + (n || "erreur inconnue") + ").");
+      return;
+    }
+    video.srcObject = stream;
+    try { await video.play(); } catch (e) {}
+    $("ph").hidden = true;
+    running = true; bg = null; hits = 0; lastMask = null; lastEnd = 0;
+    warmUntil = performance.now() + 2500;
+    $("go").textContent = "Arrêter la surveillance"; $("go").classList.add("stop");
+    $("dark").disabled = false;
+    requestWake();
+    draw();
+    raf = requestAnimationFrame(tick);
+  }
+
+  function stop(){
+    running = false; cancelAnimationFrame(raf);
+    if (stream) { stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+    video.srcObject = null;
+    stopAlarm();
+    try { if (wake) wake.release(); } catch (e) {}
+    wake = null; lastMask = null; bg = null;
+    $("alarm").hidden = true; $("black").hidden = true; $("dark").disabled = true;
+    $("ph").hidden = false; $("mf").style.width = "0";
+    $("go").textContent = "Démarrer la surveillance"; $("go").classList.remove("stop");
+    setStatus("Arrêté");
+    draw();
+  }
+
+  syncLabels();
+  draw();
+})();
+</script>
+</body>
+</html>
